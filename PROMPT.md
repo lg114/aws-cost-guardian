@@ -2,20 +2,12 @@
 
 ## Task
 
-Analyze my AWS environment and generate a comprehensive cost optimization report with actionable remediation scripts. Follow the steps below to identify cost anomalies, optimize resource usage, and generate infrastructure-as-code templates for cost savings.
+Analyze my AWS environment and generate a cost optimization report with remediation scripts. Use actual resource IDs from my environment — never use placeholders.
 
 ## Step 1: Cost Anomaly Detection
 
-Analyze my AWS costs for the last 30 days and identify:
+Analyze my AWS costs for the last 30 days and identify sudden spikes (>20% day-over-day), gradual drift (>30% month-over-month), outlier services (>40% of bill), and idle resources (<5% utilization for 7 days).
 
-1. **Sudden spikes** (>20% day-over-day increase)
-2. **Gradual drift** (>30% month-over-month increase)
-3. **Outlier services** (consuming >40% of total bill)
-4. **Idle resources** (<5% utilization over 7 days)
-
-**IMPORTANT:** Use actual resource IDs from my environment. Do NOT use placeholders like `INSTANCE_ID`.
-
-Run this command to get cost data:
 ```bash
 aws ce get-cost-and-usage \
   --time-period Start=$(date -u -d '30 days ago' +%Y-%m-%d),End=$(date -u +%Y-%m-%d) \
@@ -24,285 +16,91 @@ aws ce get-cost-and-usage \
   --group-by Type=DIMENSION,Key=SERVICE
 ```
 
-**Output format:**
-```markdown
-## Cost Anomaly Report
+**Output:** Table with columns: Metric | Current | Previous | Change | Status
 
-| Metric | Current | Previous | Change | Status |
-|--------|---------|----------|--------|--------|
-| Total Cost | $X | $Y | +Z% | ⚠️/✅ |
-| Top Service | Service A | — | $X | +Y% |
+## Step 2: Service Analysis
 
-### Anomalies Detected
-1. [Anomaly description with evidence]
-2. [Anomaly description with evidence]
-```
+Analyze EC2, S3, RDS, Lambda, and EKS for optimization opportunities.
 
-## Step 2: Service-by-Service Analysis
-
-For each of the following services, analyze usage patterns and identify optimization opportunities.
-
-**IMPORTANT:** Use actual resource IDs from my environment. Replace placeholders with real values.
-
-### EC2 Analysis
+**EC2:** Check idle instances (CPU <5% for 7 days), over-provisioned instances, unattached EBS volumes, old snapshots (>90 days)
 ```bash
-# List instances with utilization
 aws ec2 describe-instances --query 'Reservations[].Instances[].[InstanceId,InstanceType,State.Name,LaunchTime]'
-
-# Get CPU utilization for each instance
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/EC2 \
-  --metric-name CPUUtilization \
-  --dimensions Name=InstanceId,Value=ACTUAL_INSTANCE_ID \
-  --start-time $(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 86400 \
-  --statistics Average
 ```
 
-**Check for:**
-- Idle instances (CPU <5% for 7+ days)
-- Over-provisioned instances (right-size by 1-2 types)
-- Unattached EBS volumes
-- Old snapshots (>90 days)
-
-### S3 Analysis
+**S3:** Check wrong storage class, incomplete multipart uploads, old versions without lifecycle policies
 ```bash
-# List buckets with sizes
-aws s3api list-buckets --query 'Buckets[].Name' --output text | \
-  xargs -I {} sh -c 'echo -n "{}: "; aws s3 ls s3://{} --recursive --summarize 2>/dev/null | tail -1'
+aws s3api list-buckets --query 'Buckets[].Name' --output text | xargs -I {} sh -c 'echo -n "{}: "; aws s3 ls s3://{} --recursive --summarize 2>/dev/null | tail -1'
 ```
 
-**Check for:**
-- Wrong storage class (Standard for infrequent access)
-- Incomplete multipart uploads
-- Old versions without lifecycle policies
-
-### RDS Analysis
+**RDS:** Check over-provisioned instances (CPU/memory <20%), idle databases (0 connections for 7 days)
 ```bash
-# List instances
-aws rds describe-db-instances \
-  --query 'DBInstances[].[DBInstanceIdentifier,DBInstanceClass,Engine,AllocatedStorage]'
+aws rds describe-db-instances --query 'DBInstances[].[DBInstanceIdentifier,DBInstanceClass,Engine,AllocatedStorage]'
 ```
 
-**Check for:**
-- Over-provisioned instances (CPU/memory <20%)
-- Idle databases (0 connections for 7+ days)
-- Excessive backup retention
-
-### Lambda Analysis
+**Lambda:** Check over-provisioned memory, unused functions (0 invocations in 30 days)
 ```bash
-# List functions
 aws lambda list-functions --query 'Functions[].[FunctionName,MemorySize,LastModified]'
 ```
 
-**Check for:**
-- Over-provisioned memory
-- Unused functions (0 invocations in 30+ days)
-- Large deployment packages
-
-### EKS Analysis
+**EKS:** Check over-provisioned nodes, idle namespaces, unbound PVCs
 ```bash
-# List clusters and node groups
-aws eks list-clusters
-aws eks list-nodegroups --cluster-name ACTUAL_CLUSTER_NAME
+aws eks list-clusters && aws eks list-nodegroups --cluster-name CLUSTER_NAME
 ```
 
-**Check for:**
-- Over-provisioned nodes
-- Idle namespaces
-- Unbound PVCs
+**Output:** Table per service with columns: Resource | Issue | Current | Recommended | Est. Savings
 
-**Output format:**
-```markdown
-## Service Analysis
+## Step 3: Optimization Plan
 
-### EC2
-| Resource | Issue | Current | Recommended | Est. Savings |
-|----------|-------|---------|-------------|--------------|
-| i-0abc123 | Idle | m5.large | Stop | $70/month |
+Generate a prioritized plan with three levels:
+1. **Quick Wins** (Low Risk, High Impact) — Safe changes like adding tags, changing storage class
+2. **Medium Impact** (May require downtime) — Resizing instances, changing instance types
+3. **Long-term** (Reserved Instances, Savings Plans) — Commitment-based savings
 
-### S3
-| Bucket | Issue | Current | Recommended | Est. Savings |
-|--------|-------|---------|-------------|--------------|
-| app-logs | Wrong class | Standard | Standard-IA | $40/month |
+**Output:** Table with columns: Priority | Action | Est. Savings | Risk
 
-[Continue for each service...]
-```
+## Step 4: Remediation Scripts
 
-## Step 3: Generate Optimization Plan
+For each optimization, generate scripts in all three formats. Use actual resource IDs.
 
-Based on the analysis, generate a prioritized optimization plan:
-
-```markdown
-## Optimization Plan
-
-### Priority 1: Quick Wins (Low Risk, High Impact)
-1. [Action] — Est. savings: $X/month — Risk: Low
-2. [Action] — Est. savings: $X/month — Risk: Low
-
-### Priority 2: Medium Impact (May require downtime)
-1. [Action] — Est. savings: $X/month — Risk: Medium
-2. [Action] — Est. savings: $X/month — Risk: Medium
-
-### Priority 3: Long-term (Reserved Instances, Savings Plans)
-1. [Action] — Est. savings: $X/month — Risk: Low
-
-**Total Estimated Savings: $X/month ($Y/year)**
-```
-
-## Step 4: Generate Remediation Scripts
-
-For each optimization, generate scripts in all three formats. **Use actual resource IDs from my environment.**
-
-### Decision Guide: When to Use Each Format
-
-| Format | Use When | Pros | Cons |
-|--------|----------|------|------|
-| **AWS CLI** | Quick testing, one-time changes | Fast, immediate | No version control, hard to rollback |
-| **CloudFormation** | Production AWS environments | Version controlled, rollback support | AWS-specific, verbose |
-| **Terraform** | Multi-cloud or complex infrastructure | Cloud-agnostic, modular | Requires Terraform setup |
-
-### Option A: AWS CLI Script (Quick Testing)
+**AWS CLI** — Quick testing, one-time changes. Include rollback commands.
 ```bash
 #!/bin/bash
-# AWS Cost Guardian — Remediation Script
-# Generated: [Date]
-# Total Estimated Savings: $X/month
-# Risk Level: Low/Medium/High
-
-# === [Action 1] ===
+# Estimated Savings: $X/month | Risk: Low/Medium/High
 aws [command]
-# This does [explanation]
-
-# === Rollback ===
-# aws [rollback-command]
+# Rollback: aws [rollback-command]
 ```
 
-### Option B: CloudFormation Template (Production Deployment)
+**CloudFormation** — Production deployment with version control and rollback support.
 ```yaml
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'AWS Cost Guardian — Cost Optimization Resources'
-
+Description: 'Cost Optimization'
 Parameters:
   Environment:
     Type: String
     Default: production
-    AllowedValues: [production, staging, development]
-
 Resources:
-  # S3 Lifecycle Policy
-  S3Bucket:
-    Type: 'AWS::S3::Bucket'
-    Properties:
-      BucketName: !Sub '${Environment}-optimized-bucket'
-      LifecycleConfiguration:
-        Rules:
-          - Id: MoveToIA
-            Status: Enabled
-            Transitions:
-              - TransitionInDays: 30
-                StorageClass: STANDARD_IA
-            ExpirationInDays: 90
-
-  # Billing Alarm
-  BillingAlarm:
-    Type: 'AWS::CloudWatch::Alarm'
-    Properties:
-      AlarmName: !Sub '${Environment}-billing-alarm'
-      AlarmDescription: 'Alert when AWS costs exceed threshold'
-      MetricName: EstimatedCharges
-      Namespace: AWS/Billing
-      Statistic: Maximum
-      Period: 21600
-      Threshold: 1000
-      ComparisonOperator: GreaterThanThreshold
-      EvaluationPeriods: 1
-      AlarmActions:
-        - !Ref SNSTopic
-
-  SNSTopic:
-    Type: 'AWS::SNS::Topic'
-    Properties:
-      TopicName: !Sub '${Environment}-cost-alerts'
-
-Outputs:
-  BucketName:
-    Value: !Ref S3Bucket
-  SNSTopicArn:
-    Value: !Ref SNSTopic
+  # Resource definitions
 ```
 
-### Option C: Terraform Module (Infrastructure-as-Code)
+**Terraform** — Multi-cloud or complex infrastructure. Include variables and outputs.
 ```hcl
-# AWS Cost Guardian — Cost Optimization Terraform Module
-
 variable "environment" {
-  description = "Environment name (production, staging, development)"
-  type        = string
-  default     = "production"
+  type    = string
+  default = "production"
 }
-
-variable "billing_threshold" {
-  description = "Billing alarm threshold in USD"
-  type        = number
-  default     = 1000
-}
-
-# S3 Lifecycle Policy
-resource "aws_s3_bucket_lifecycle_configuration" "cost_optimization" {
-  bucket = aws_s3_bucket.main.id
-
-  rule {
-    id     = "move-to-ia"
-    status = "Enabled"
-
-    transition {
-      days          = 30
-      storage_class = "STANDARD_IA"
-    }
-
-    expiration {
-      days = 90
-    }
-  }
-}
-
-# Billing Alarm
-resource "aws_cloudwatch_metric_alarm" "billing" {
-  alarm_name          = "${var.environment}-billing-alarm"
-  alarm_description   = "Alert when AWS costs exceed threshold"
-  metric_name         = "EstimatedCharges"
-  namespace           = "AWS/Billing"
-  statistic           = "Maximum"
-  period              = 21600
-  threshold           = var.billing_threshold
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 1
-  alarm_actions       = [aws_sns_topic.cost_alerts.arn]
-}
-
-resource "aws_sns_topic" "cost_alerts" {
-  name = "${var.environment}-cost-alerts"
-}
-
-output "sns_topic_arn" {
-  value = aws_sns_topic.cost_alerts.arn
+# Resource definitions
+output "resource_id" {
+  value = resource.name.id
 }
 ```
 
-## Step 5: Generate Monitoring Setup
+## Step 5: Monitoring Setup
 
 Create CloudWatch alarms for ongoing cost monitoring:
-
 ```bash
-# Create SNS topic for alerts
-aws sns create-topic --name cost-alerts
-
-# Create billing alarm
+# Billing alarm
 aws cloudwatch put-metric-alarm \
-  --alarm-name "AWS-Cost-Alert-1000" \
-  --alarm-description "Alert when AWS costs exceed $1,000" \
+  --alarm-name "AWS-Cost-Alert" \
   --metric-name EstimatedCharges \
   --namespace AWS/Billing \
   --statistic Maximum \
@@ -310,80 +108,26 @@ aws cloudwatch put-metric-alarm \
   --threshold 1000 \
   --comparison-operator GreaterThanThreshold \
   --evaluation-periods 1 \
-  --alarm-actions arn:aws:sns:REGION:ACCOUNT_ID:cost-alerts
-
-# Create EC2 CPU utilization alarm
-aws cloudwatch put-metric-alarm \
-  --alarm-name "EC2-High-CPU" \
-  --alarm-description "Alert when EC2 CPU > 80%" \
-  --metric-name CPUUtilization \
-  --namespace AWS/EC2 \
-  --statistic Average \
-  --period 300 \
-  --threshold 80 \
-  --comparison-operator GreaterThanThreshold \
-  --evaluation-periods 3 \
-  --dimensions Name=InstanceId,Value=ACTUAL_INSTANCE_ID \
-  --alarm-actions arn:aws:sns:REGION:ACCOUNT_ID:cost-alerts
+  --alarm-actions SNS_TOPIC_ARN
 ```
 
-**Output format:**
-```markdown
-## Monitoring Setup
-
-### Billing Alarms
-- [Alarm name]: Alert when costs exceed $X — [CLI command]
-
-### Resource Alarms
-- [Alarm name]: Alert when [resource] exceeds [threshold] — [CLI command]
-```
+**Output:** List of alarms with names, thresholds, and CLI commands
 
 ## Step 6: Summary Report
 
-Generate a final summary:
+Generate final summary:
+- **Analysis Period:** Start date, End date, Total cost analyzed
+- **Findings:** Number of anomalies, optimization opportunities, idle resources
+- **Recommendations:** Table with Priority | Action | Est. Savings | Risk | Implementation format
+- **Total Savings:** Monthly, Annual, Percentage
+- **Next Steps:** Review priorities, schedule maintenance window, evaluate Reserved Instances
+- **Files Generated:** List of output files (report, CLI script, CloudFormation template, Terraform module, monitoring setup)
 
-```markdown
-## Cost Optimization Summary
+## Important Rules
 
-### Analysis Period
-- Start: [Date]
-- End: [Date]
-- Total Cost Analyzed: $X
-
-### Findings
-- [N] anomalies detected
-- [N] optimization opportunities
-- [N] idle resources identified
-
-### Recommendations
-| Priority | Action | Est. Savings | Risk | Implementation |
-|----------|--------|--------------|------|----------------|
-| 1 | [Action] | $X/month | Low | CLI/CF/TF |
-| 2 | [Action] | $X/month | Medium | CLI/CF/TF |
-
-### Total Potential Savings
-- Monthly: $X
-- Annual: $Y
-- Percentage: Z%
-
-### Next Steps
-1. Review and approve Priority 1 actions
-2. Schedule Priority 2 actions during maintenance window
-3. Evaluate Reserved Instance purchases for Priority 3
-
-### Files Generated
-- `cost-optimization-report.md` — Full analysis report
-- `remediation-cli.sh` — AWS CLI remediation script
-- `remediation-cloudformation.yaml` — CloudFormation template
-- `remediation-terraform.tf` — Terraform module
-- `monitoring-alarms.sh` — CloudWatch alarm setup
-```
-
-## Important Notes
-
-1. **Never auto-execute destructive actions** — All scripts are presented for review
+1. **Never auto-execute destructive actions** — Present all scripts for review
 2. **Provide rollback commands** — Every action has an undo option
 3. **Estimate cost savings** — Every recommendation includes expected savings
 4. **Flag risk levels** — Low/Medium/High for each action
-5. **Use actual resource IDs** — Do not use placeholders
+5. **Use actual resource IDs** — Never use placeholders
 6. **Verify before cleanup** — Check for dependencies before deleting resources
