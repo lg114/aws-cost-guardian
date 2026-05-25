@@ -194,7 +194,7 @@ After running this prompt, you will have:
 ## Project Structure
 
 ```
-├── PROMPT.md                    # Main task prompt (copy this)
+├── PROMPT.md                    # System prompt (copy this)
 ├── modular-components/          # Modular design components
 │   ├── core-identity.md         # Task execution rules
 │   ├── cost-analysis.md         # Analysis framework
