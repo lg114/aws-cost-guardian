@@ -2,35 +2,31 @@
 
 ## User Message
 
-"I have 5 idle EC2 instances that I want to clean up. Can you generate a script?"
+"I have 5 idle EC2 instances. Generate remediation scripts in all three formats."
 
-## Guardian Response
+## AI Response
 
-## Remediation: Idle EC2 Instances
+## Step 1: Analysis
 
-**Issue**: 5 EC2 instances have been idle (<2% CPU) for 14+ days
-**Estimated Savings**: $350/month
-**Risk Level**: Low (stop) / High (terminate)
+| Instance ID | Type | CPU (14-day avg) | Status | Monthly Cost |
+|-------------|------|------------------|--------|--------------|
+| i-0abc123 | m5.large | 1.2% | Idle | $70 |
+| i-0def456 | m5.large | 0.8% | Idle | $70 |
+| i-0ghi789 | m5.xlarge | 1.5% | Idle | $140 |
+| i-0jkl012 | t3.medium | 0.5% | Idle | $30 |
+| i-0mno345 | t3.medium | 1.1% | Idle | $30 |
 
-### Instance Details
+**Total Monthly Cost: $340**
+**Estimated Savings: $340/month ($4,080/year)**
 
-| Instance ID | Type | CPU (14-day avg) | Monthly Cost |
-|-------------|------|------------------|--------------|
-| i-0abc123 | m5.large | 1.2% | $70 |
-| i-0def456 | m5.large | 0.8% | $70 |
-| i-0ghi789 | m5.xlarge | 1.5% | $140 |
-| i-0jkl012 | t3.medium | 0.5% | $30 |
-| i-0mno345 | t3.medium | 1.1% | $30 |
+## Step 2: Remediation Scripts
 
-### Option 1: Stop Instances (Recommended)
-
-Stopping instances preserves their EBS volumes and allows restart if needed.
-
+### Option A: AWS CLI (Quick)
 ```bash
 #!/bin/bash
 # AWS Cost Guardian — Stop Idle EC2 Instances
 # Generated: 2024-05-25
-# Estimated Savings: $350/month
+# Estimated Savings: $340/month
 # Risk Level: Low
 
 # Stop all idle instances
@@ -40,46 +36,66 @@ echo "Instances stopped. EBS volumes preserved."
 echo "To restart: aws ec2 start-instances --instance-ids i-0abc123 i-0def456 i-0ghi789 i-0jkl012 i-0mno345"
 ```
 
-### Option 2: Terminate Instances
+### Option B: CloudFormation (Production)
+```yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Cost Guardian — Stop Idle EC2 Instances'
 
-Terminating instances deletes them permanently. **Create AMI backups first.**
+Resources:
+  StopIdleInstancesPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: 'StopIdleEC2Instances'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: 'ec2:StopInstances'
+            Resource:
+              - 'arn:aws:ec2:*:*:instance/i-0abc123'
+              - 'arn:aws:ec2:*:*:instance/i-0def456'
+              - 'arn:aws:ec2:*:*:instance/i-0ghi789'
+              - 'arn:aws:ec2:*:*:instance/i-0jkl012'
+              - 'arn:aws:ec2:*:*:instance/i-0mno345'
+```
 
-```bash
-#!/bin/bash
-# AWS Cost Guardian — Terminate Idle EC2 Instances
+### Option C: Terraform (Infrastructure)
+```hcl
+# AWS Cost Guardian — Stop Idle EC2 Instances
 # Generated: 2024-05-25
-# Estimated Savings: $350/month
-# Risk Level: High
+# Estimated Savings: $340/month
 
-# Create AMI backups before termination
-for i in i-0abc123 i-0def456 i-0ghi789 i-0jkl012 i-0mno345; do
-  aws ec2 create-image \
-    --instance-id $i \
-    --name "backup-${i}-$(date +%Y%m%d)" \
-    --no-reboot
-done
+variable "idle_instances" {
+  description = "List of idle EC2 instance IDs"
+  type        = list(string)
+  default     = ["i-0abc123", "i-0def456", "i-0ghi789", "i-0jkl012", "i-0mno345"]
+}
 
-echo "AMIs created. Waiting 60 seconds for completion..."
-sleep 60
+resource "aws_ec2_instance_state" "idle" {
+  for_each    = toset(var.idle_instances)
+  instance_id = each.value
+  state       = "stopped"
+}
 
-# Terminate instances
-aws ec2 terminate-instances --instance-ids i-0abc123 i-0def456 i-0ghi789 i-0jkl012 i-0mno345
-
-echo "Instances terminated. AMIs available for recovery."
+output "stopped_instances" {
+  description = "List of stopped instance IDs"
+  value       = values(aws_ec2_instance_state.idle)[*].instance_id
+}
 ```
 
-### Option 3: Schedule Stop/Start
-
-If instances are only needed during business hours:
+## Step 3: Monitoring Setup
 
 ```bash
-#!/bin/bash
-# AWS Cost Guardian — Schedule EC2 Instances
-# Stop at 7pm, Start at 7am (weekdays only)
-# Estimated Savings: ~$210/month (60% reduction)
-
-# Create IAM role for Lambda (if not exists)
-# ... (Lambda function code to stop/start instances on schedule)
+# Create alarm for idle instances
+aws cloudwatch put-metric-alarm \
+  --alarm-name "Idle-EC2-Alert" \
+  --alarm-description "Alert when EC2 CPU < 5% for 7 days" \
+  --metric-name CPUUtilization \
+  --namespace AWS/EC2 \
+  --statistic Average \
+  --period 604800 \
+  --threshold 5 \
+  --comparison-operator LessThanThreshold \
+  --evaluation-periods 1 \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:idle-alerts
 ```
-
-**Would you like me to proceed with any of these options?**

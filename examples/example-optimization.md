@@ -1,101 +1,117 @@
-# Example: Cost Optimization
+# Example: Multi-Service Cost Optimization
 
 ## User Message
 
-"I want to optimize my AWS costs. Can you analyze my environment and suggest savings?"
+"Analyze my AWS environment and generate a comprehensive cost optimization report."
 
-## Guardian Response
+## AI Response
 
-## Cost Analysis Summary
+## Step 1: Cost Anomaly Report
 
-| Service | Current Cost | Optimized Cost | Savings |
-|---------|--------------|----------------|---------|
-| EC2 | $2,400/month | $1,680/month | $720 (30%) |
-| S3 | $300/month | $180/month | $120 (40%) |
-| RDS | $600/month | $420/month | $180 (30%) |
-| Lambda | $50/month | $40/month | $10 (20%) |
-| **Total** | **$3,350/month** | **$2,320/month** | **$1,030 (31%)** |
+| Service | Current Cost | Previous Month | Change | Status |
+|---------|--------------|----------------|--------|--------|
+| EC2 | $2,400 | $2,400 | 0% | ✅ Normal |
+| S3 | $300 | $250 | +20% | ⚠️ Drift |
+| RDS | $600 | $600 | 0% | ✅ Normal |
+| Lambda | $50 | $50 | 0% | ✅ Normal |
+| **Total** | **$3,350** | **$3,300** | **+1.5%** | ✅ Normal |
 
-### EC2 Optimization ($720/month savings)
+## Step 2: Service Analysis
 
-**Current State:**
-- 10x m5.xlarge instances running 24/7
-- Average CPU utilization: 25%
-- All On-Demand pricing
+### EC2 Analysis
+| Instance | Type | CPU | Status | Recommendation | Savings |
+|----------|------|-----|--------|----------------|---------|
+| web-1 | m5.xlarge | 25% | Over-provisioned | Right-size to m5.large | $360/yr |
+| web-2 | m5.xlarge | 25% | Over-provisioned | Right-size to m5.large | $360/yr |
+| web-3 | m5.xlarge | 25% | Over-provisioned | Right-size to m5.large | $360/yr |
 
-**Recommendations:**
-1. Right-size to m5.large (sufficient for 25% utilization) — Save $360/month
-2. Purchase 1-year Reserved Instances for steady-state — Save $360/month
+### S3 Analysis
+| Bucket | Size | Class | Issue | Recommendation | Savings |
+|--------|------|-------|-------|----------------|---------|
+| app-logs | 5TB | Standard | Wrong class | Move to Standard-IA | $120/yr |
 
-**Action:**
+### RDS Analysis
+| Instance | Class | CPU | Status | Recommendation | Savings |
+|----------|-------|-----|--------|----------------|---------|
+| prod-db | db.r5.xlarge | 15% | Over-provisioned | Right-size to db.r5.large | $180/yr |
+
+## Step 3: Optimization Plan
+
+### Priority 1: Quick Wins
+1. Right-size EC2 instances — Est. savings: $720/year — Risk: Medium
+2. Apply S3 lifecycle policy — Est. savings: $120/year — Risk: Low
+
+### Priority 2: Reserved Instances
+1. Purchase 1-year RI for EC2 — Est. savings: $720/year — Risk: Low
+2. Purchase 1-year RI for RDS — Est. savings: $180/year — Risk: Low
+
+**Total Estimated Savings: $1,740/year**
+
+## Step 4: Remediation Scripts
+
+### Option A: AWS CLI
 ```bash
-# Right-size instances (stop, change type, start)
-for i in i-001 i-002 i-003 i-004 i-005 i-006 i-007 i-008 i-009 i-010; do
+#!/bin/bash
+# AWS Cost Guardian — Multi-Service Optimization
+# Total Estimated Savings: $1,740/year
+
+# === EC2 Right-sizing ===
+for i in web-1 web-2 web-3; do
   aws ec2 stop-instances --instance-ids $i
   aws ec2 modify-instance-attribute --instance-id $i --instance-type m5.large
   aws ec2 start-instances --instance-ids $i
 done
-```
 
-### S3 Optimization ($120/month savings)
-
-**Current State:**
-- 5TB in Standard storage
-- No lifecycle policies
-- 500GB of logs older than 30 days
-
-**Recommendations:**
-1. Move logs to Standard-IA after 30 days — Save $60/month
-2. Expire old logs after 90 days — Save $60/month
-
-**Action:**
-```bash
+# === S3 Lifecycle Policy ===
 aws s3api put-bucket-lifecycle-configuration \
-  --bucket my-app-logs \
+  --bucket app-logs \
   --lifecycle-configuration '{
     "Rules": [{
-      "ID": "OptimizeLogs",
+      "ID": "MoveToIA",
       "Status": "Enabled",
-      "Filter": {"Prefix": "logs/"},
-      "Transitions": [{"Days": 30, "StorageClass": "STANDARD_IA"}],
-      "Expiration": {"Days": 90}
+      "Transitions": [{"Days": 30, "StorageClass": "STANDARD_IA"}]
     }]
   }'
 ```
 
-### RDS Optimization ($180/month savings)
+### Option B: CloudFormation
+```yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Cost Guardian — Multi-Service Optimization'
 
-**Current State:**
-- 2x db.r5.xlarge instances
-- Average CPU: 15%
-- No Reserved Instances
-
-**Recommendations:**
-1. Right-size to db.r5.large — Save $90/month
-2. Purchase 1-year RI — Save $90/month
-
-**Action:**
-```bash
-# Modify instance class (requires downtime)
-aws rds modify-db-instance \
-  --db-instance-identifier prod-db \
-  --db-instance-class db.r5.large \
-  --apply-immediately
+Resources:
+  S3Lifecycle:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: app-logs
+      LifecycleConfiguration:
+        Rules:
+          - Id: MoveToIA
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
 ```
 
-### Lambda Optimization ($10/month savings)
-
-**Current State:**
-- 50 functions, all at 512MB memory
-- Power Tuning shows optimal at 256MB for 40 functions
-
-**Recommendations:**
-1. Right-size memory for 40 functions — Save $10/month
-
-**Action:**
-```bash
-# Update function memory
-aws lambda update-function-configuration \
-  --function-name my-function \
-  --memory-size 256
+### Option C: Terraform
+```hcl
+# S3 Lifecycle Policy
+resource "aws_s3_bucket_lifecycle_configuration" "logs" {
+  bucket = "app-logs"
+  rule {
+    id     = "move-to-ia"
+    status = "Enabled"
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+  }
+}
 ```
+
+## Step 6: Summary Report
+
+### Total Potential Savings
+- Monthly: $145
+- Annual: $1,740
+- Percentage: 5.2%
