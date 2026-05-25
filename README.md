@@ -15,9 +15,10 @@
 Before using this prompt, ensure you have:
 
 ### AWS Account Setup
-- Active AWS account with billing enabled
-- Cost Explorer enabled (Billing Console → Cost Explorer → Enable)
-- AWS CLI installed and configured with credentials
+1. **Active AWS account** with billing enabled
+2. **Cost Explorer enabled** — Go to Billing Console → Cost Explorer → Enable (wait 24 hours for data)
+3. **AWS CLI installed** — Version 2.x recommended
+4. **AWS CLI configured** — Run `aws configure` with your credentials
 
 ### Required IAM Permissions
 Create an IAM policy with these permissions:
@@ -26,23 +27,70 @@ Create an IAM policy with these permissions:
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "CostExplorerRead",
       "Effect": "Allow",
       "Action": [
         "ce:GetCostAndUsage",
         "ce:GetCostForecast",
+        "ce:GetDimensionValues"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchRead",
+      "Effect": "Allow",
+      "Action": [
         "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EC2Read",
+      "Effect": "Allow",
+      "Action": [
         "ec2:DescribeInstances",
         "ec2:DescribeVolumes",
         "ec2:DescribeSnapshots",
+        "ec2:DescribeInstanceTypes"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3Read",
+      "Effect": "Allow",
+      "Action": [
         "s3:ListAllMyBuckets",
         "s3:GetBucketLocation",
+        "s3:ListBucket"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "RDSRead",
+      "Effect": "Allow",
+      "Action": [
         "rds:DescribeDBInstances",
-        "rds:DescribeDBSnapshots",
+        "rds:DescribeDBSnapshots"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LambdaRead",
+      "Effect": "Allow",
+      "Action": [
         "lambda:ListFunctions",
+        "lambda:GetFunction"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EKSRead",
+      "Effect": "Allow",
+      "Action": [
         "eks:ListClusters",
         "eks:ListNodegroups",
-        "iam:ListRoles",
-        "iam:ListPolicies"
+        "eks:DescribeCluster"
       ],
       "Resource": "*"
     }
@@ -50,9 +98,10 @@ Create an IAM policy with these permissions:
 }
 ```
 
-### Optional
-- CloudWatch Agent installed (for memory/disk metrics)
-- AWS Organizations access (for multi-account analysis)
+### Optional (for enhanced analysis)
+- **CloudWatch Agent** — For memory and disk metrics
+- **AWS Organizations access** — For multi-account analysis
+- **Tagging strategy** — Resources tagged with Environment, Team, Project
 
 ## Use Case
 
@@ -106,7 +155,7 @@ After running this prompt, you will have:
 
 ## AWS Well-Architected Framework Alignment
 
-### Cost Optimization (Core Focus)
+### Cost Optimization ✅ (Core Focus)
 - Identify and eliminate waste
 - Right-size resources based on actual usage
 - Implement Reserved Instances and Savings Plans
@@ -116,33 +165,38 @@ After running this prompt, you will have:
 - IAM least privilege for remediation actions
 - No credential exposure in scripts
 - Audit trail for all changes
+- Generate IAM policies for remediation
 
 ### Operational Excellence
 - Automated cost reporting
 - Monitoring setup for ongoing tracking
 - Standardized remediation procedures
+- Infrastructure-as-code for version control
 
 ### Reliability
 - Right-sizing ensures adequate capacity
 - Backup verification before cleanup
 - Rollback commands for all changes
+- CloudFormation/Terraform for rollback support
 
 ### Performance Efficiency
 - Right-sizing ensures optimal performance
 - Resource utilization analysis
 - Cold start optimization for Lambda
+- Storage tier optimization
 
 ### Sustainability
 - Resource efficiency reduces carbon footprint
 - Eliminate idle resources
 - Optimize storage tiers
+- Right-size to reduce over-provisioning
 
 ## Project Structure
 
 ```
 ├── PROMPT.md                    # Main task prompt (copy this)
 ├── modular-components/          # Modular design components
-│   ├── core-identity.md         # Guardian persona and guardrails
+│   ├── core-identity.md         # Task execution rules
 │   ├── cost-analysis.md         # Analysis framework
 │   ├── remediation.md           # Remediation engine
 │   └── services/                # Per-service analysis modules
@@ -161,30 +215,40 @@ After running this prompt, you will have:
 
 ## Troubleshooting
 
-### "I don't have access to Cost Explorer"
-**Solution**: Enable Cost Explorer in AWS Billing Console. Wait 24 hours for data to populate.
+### "Cost Explorer data not available"
+**Problem:** Cost Explorer shows no data or errors.
+**Solution:**
+1. Enable Cost Explorer in Billing Console
+2. Wait 24 hours for data to populate
+3. Verify IAM permissions include `ce:GetCostAndUsage`
 
-### "The prompt can't access my AWS resources"
-**Solution**: Ensure your IAM policy includes the required permissions listed in Prerequisites.
-
-### "Recommendations don't match my actual usage"
-**Solution**:
-- Wait for more CloudWatch data (7-14 days)
-- Check if CloudWatch Agent is installed for memory metrics
-- Provide context about your workload patterns
+### "CloudWatch metrics missing"
+**Problem:** No CPU/memory metrics for resources.
+**Solution:**
+1. Verify CloudWatch Agent is installed (for memory metrics)
+2. Check that detailed monitoring is enabled for EC2
+3. Ensure IAM permissions include `cloudwatch:GetMetricStatistics`
 
 ### "Remediation script failed"
-**Solution**:
-- Check IAM permissions for write access
-- Verify resource hasn't changed since analysis
-- Ensure correct AWS region is configured
+**Problem:** Generated script returns errors.
+**Solution:**
+1. Check IAM permissions for write access
+2. Verify resource hasn't changed since analysis
+3. Ensure correct AWS region is configured
+4. Check if resource is in a different account
 
-### "The prompt recommended terminating a production instance"
-**Solution**:
-- Don't panic — the prompt only recommends, never auto-executes
-- Review the utilization data provided
-- Mark production resources with `Production` tag
-- Ask for re-analysis with production context
+### "Wrong resource IDs"
+**Problem:** Script uses placeholder IDs instead of real ones.
+**Solution:**
+1. Re-run the prompt and explicitly ask for actual resource IDs
+2. Provide your resource IDs in the prompt
+
+### "CloudFormation stack creation failed"
+**Problem:** CloudFormation template fails to deploy.
+**Solution:**
+1. Check CloudFormation events for error details
+2. Verify IAM permissions for resource creation
+3. Ensure resource names don't conflict with existing resources
 
 ## Example Usage
 
