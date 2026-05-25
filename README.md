@@ -137,6 +137,9 @@ After running this prompt, you will have:
    - Terraform modules (infrastructure-as-code)
 5. **Monitoring Setup** — CloudWatch alarms for ongoing cost tracking
 6. **Summary Report** — Executive overview with total savings potential
+7. **AWS Native Service Integration** — Cost Anomaly Detection, Trusted Advisor, Compute Optimizer, Budgets
+8. **Multi-Account/Region Analysis** — Cross-account and cross-region cost analysis
+9. **Cost Forecasting** — Monthly forecasts, trend analysis, RI/Savings Plans recommendations
 
 ## AWS Services Used
 
@@ -152,6 +155,11 @@ After running this prompt, you will have:
 | **AWS IAM** | Permission analysis, least privilege |
 | **AWS CloudFormation** | Infrastructure-as-code output |
 | **Amazon SNS** | Billing alert notifications |
+| **AWS Cost Anomaly Detection** | Automated anomaly detection |
+| **AWS Trusted Advisor** | Cost optimization checks |
+| **AWS Compute Optimizer** | Right-sizing recommendations |
+| **AWS Budgets** | Budget alerts and tracking |
+| **AWS Organizations** | Multi-account analysis |
 
 ## AWS Well-Architected Framework Alignment
 
@@ -271,6 +279,27 @@ AI: [Analyzes EC2 instances, provides right-sizing recommendations, generates mi
 User: My S3 costs are increasing. How can I optimize my storage?
 
 AI: [Analyzes S3 buckets, recommends lifecycle policies, generates CloudFormation template]
+```
+
+### Multi-Account Analysis
+```
+User: Analyze costs across all accounts in my AWS Organization.
+
+AI: [Lists all accounts, analyzes cost by account, identifies top spenders]
+```
+
+### Cost Forecasting
+```
+User: What will my AWS costs be next month?
+
+AI: [Generates 30-day forecast, compares to current month, identifies trends]
+```
+
+### AWS Native Services
+```
+User: Check Trusted Advisor for cost optimization recommendations.
+
+AI: [Lists cost optimization checks, identifies issues, generates remediation scripts]
 ```
 
 ## Safety Features
