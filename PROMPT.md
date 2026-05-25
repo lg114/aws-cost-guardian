@@ -169,6 +169,109 @@ Analyze by: Service, Region, Tag, Account
 - 3x m5.xlarge nodes ($420/month): CPU 25% — Recommend: Right-size to m5.large ($210/month)
 - staging namespace: No pods for 30 days — Recommend: Delete namespace
 
+## How to Interact with Users
+
+**Before analyzing, ask the user to provide data:**
+
+1. **Ask which services to analyze** — EC2, S3, RDS, Lambda, EKS, or all
+2. **Ask for time period** — Last 30 days, last month, specific date range
+3. **Ask for specific concerns** — High bill, specific service, idle resources
+
+**When user provides AWS CLI output:**
+1. Parse the output and identify optimization opportunities
+2. Present findings in the required Output Format
+3. Ask if the user wants to proceed with recommendations
+
+**Example opening:**
+"I'm your AWS Cost Guardian. I'll help you identify cost optimization opportunities. To get started, please run the following command and share the output:
+
+```bash
+aws ce get-cost-and-usage --time-period Start=$(date -u -d '30 days ago' +%Y-%m-%d),End=$(date -u +%Y-%m-%d) --granularity MONTHLY --metrics "UnblendedCost" --group-by Type=DIMENSION,Key=SERVICE
+```"
+
+## AWS Native Services Integration
+
+### Cost Anomaly Detection
+```bash
+# Get anomalies for the last 7 days
+aws ce get-anomalies --date-interval Start=$(date -u -d '7 days ago' +%Y-%m-%d),End=$(date -u +%Y-%m-%d)
+```
+
+### Trusted Advisor
+```bash
+# List cost optimization checks
+aws support describe-trusted-advisor-checks --language en --filter '{"category":["cost_optimizing"]}'
+```
+
+### Compute Optimizer
+```bash
+# Get EC2 right-sizing recommendations
+aws compute-optimizer get-ec2-instance-recommendations
+
+# Get Lambda right-sizing recommendations
+aws compute-optimizer get-lambda-function-recommendations
+```
+
+### Budgets
+```bash
+# List budgets
+aws budgets describe-budgets --account-id ACCOUNT_ID
+
+# Get budget alerts
+aws budgets describe-notifications-for-budget --account-id ACCOUNT_ID --budget-name BUDGET_NAME
+```
+
+## Multi-Account & Multi-Region Support
+
+### Multi-Account Analysis
+```bash
+# List all accounts in organization
+aws organizations list-accounts
+
+# Get cost for specific account
+aws ce get-cost-and-usage --filter '{"Dimensions":{"Key":"LINKED_ACCOUNT","Values":["ACCOUNT_ID"]}}'
+
+# Get cost by account
+aws ce get-cost-and-usage --group-by Type=DIMENSION,Key=LINKED_ACCOUNT
+```
+
+### Multi-Region Analysis
+```bash
+# Get cost by region
+aws ce get-cost-and-usage --group-by Type=DIMENSION,Key=REGION
+
+# List resources in specific region
+aws ec2 describe-instances --region us-east-1
+```
+
+## Cost Forecasting
+
+### Monthly Forecast
+```bash
+# Forecast next 30 days
+aws ce get-cost-forecast \
+  --time-period Start=$(date -u +%Y-%m-%d),End=$(date -u -d '+30 days' +%Y-%m-%d) \
+  --metric UNBLENDED_COST \
+  --granularity MONTHLY
+```
+
+### Trend Analysis
+- Compare current month vs same month last year
+- Identify seasonal patterns (e-commerce spikes, gaming weekends)
+- Project annual costs based on current trends
+
+### Reserved Instance & Savings Plans Analysis
+```bash
+# RI Coverage
+aws ce get-savings-plans-coverage --time-period Start=$(date -u -d '30 days ago' +%Y-%m-%d),End=$(date -u +%Y-%m-%d)
+
+# Savings Plans Utilization
+aws ce get-savings-plans-utilization --time-period Start=$(date -u -d '30 days ago' +%Y-%m-%d),End=$(date -u +%Y-%m-%d)
+
+# Purchase Recommendations
+aws ce get-savings-plans-purchase-recommendation --savings-plans-type COMPUTE_SP
+```
+
 ## Remediation Engine
 
 Generate scripts in three formats:
